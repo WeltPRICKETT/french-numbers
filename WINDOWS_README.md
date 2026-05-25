@@ -1,28 +1,35 @@
 # Windows 使用说明
 
-## 运行方式
+## App 版本
 
 1. 安装 Node.js LTS: https://nodejs.org/
-2. 解压本 ZIP。
-3. 双击 `start-windows.bat`。
-4. 首次运行会自动执行 `npm install`，之后会打开:
+2. 在项目目录运行:
 
-```text
-http://127.0.0.1:5173/
+```bash
+npm install
+npm run build:win
 ```
 
-## 音频说明
-
-本项目已内置 `0-100` 的法语数字离线音频:
+3. 启动生成的 Windows App:
 
 ```text
-public/audio/fr/*.wav
+release/win-unpacked/FrenchHelper.exe
 ```
 
-因此 Windows 上不依赖系统法语 TTS。网页会优先播放这些本地音频；只有本地音频缺失时才回退到浏览器 TTS。
+## 开发模式
+
+```bash
+npm run dev:electron
+```
+
+## 语音说明
+
+Windows App 使用 Electron/Chromium 的 Web Speech API 播放法语语音。请确认 Windows 已安装可用的法语语音包，或在系统设置中添加法语语音。
+
+macOS App 会优先使用系统 `say` 命令。
 
 ## 常见问题
 
-- 如果双击后提示找不到 Node.js，请安装 Node.js LTS 并重新打开终端/资源管理器。
-- 如果 5173 端口已被旧服务占用，`start-windows.bat` 会自动关闭旧进程并重启。
-- 如果浏览器没有声音，请确认系统音量、浏览器标签页没有静音。
+- 如果提示找不到 Node.js，请安装 Node.js LTS，并重新打开终端。
+- 如果语音没有声音，请检查系统音量、应用音量混音器，以及 Windows 的语音包设置。
+- 如果打包失败，请先运行 `npm install`，确保 Windows 下的依赖入口脚本已生成。

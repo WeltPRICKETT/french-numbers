@@ -51,19 +51,35 @@ npm run dev
 
 ### Windows
 
-解压 ZIP 后双击 `start-windows.bat`。首次运行会自动安装依赖，并打开：
+开发模式可双击 `start-windows.bat`，首次运行会自动安装依赖，并打开：
 
 ```text
 http://127.0.0.1:5173/
 ```
 
-本项目已内置 `0-100` 的法语数字离线音频，Windows 上不依赖系统法语 TTS。
+App 版本可运行：
+
+```bash
+npm run build:win
+```
+
+生成的程序位于：
+
+```text
+release/win-unpacked/FrenchHelper.exe
+```
+
+Windows App 使用 Electron/Chromium 的 Web Speech API 播放法语语音。若无声音，请在 Windows 系统设置中安装或启用法语语音包。
 
 ## 测试方式
 
 ```bash
 npm test
 ```
+
+## 许可证
+
+MIT
 
 ## 浏览器 TTS 限制说明
 

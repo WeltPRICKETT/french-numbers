@@ -21,6 +21,34 @@ interface Props {
 
 type Speed = 'slow' | 'normal' | 'fast';
 
+const SPEED_RATES: Record<Speed, number> = {
+  slow: 0.75,
+  normal: 1,
+  fast: 1.3,
+};
+
+function speakWithBrowser(text: string, speed: Speed) {
+  return new Promise<void>((resolve, reject) => {
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      reject(new Error('Speech synthesis is unavailable'));
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'fr-FR';
+    utterance.rate = SPEED_RATES[speed];
+    const voices = window.speechSynthesis.getVoices();
+    const frenchVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith('fr'));
+    if (frenchVoice) {
+      utterance.voice = frenchVoice;
+    }
+    utterance.onend = () => resolve();
+    utterance.onerror = () => reject(new Error('Speech synthesis failed'));
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 export default function SpeechControls({ text, label }: Props) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>('normal');
@@ -28,17 +56,21 @@ export default function SpeechControls({ text, label }: Props) {
 
   const play = useCallback(async () => {
     if (playing) return;
-    if (!window.nativeTTS) {
-      setError('TTS indisponible — veuillez utiliser l\'app');
-      return;
-    }
 
     setError('');
     setPlaying(true);
     try {
-      await window.nativeTTS.speak(text, speed);
+      if (window.nativeTTS) {
+        await window.nativeTTS.speak(text, speed);
+      } else {
+        await speakWithBrowser(text, speed);
+      }
     } catch {
-      setError('Échec de la lecture');
+      try {
+        await speakWithBrowser(text, speed);
+      } catch {
+        setError('Échec de la lecture audio');
+      }
     } finally {
       setPlaying(false);
     }

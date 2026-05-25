@@ -1,4 +1,4 @@
-import type { ExamBank, ExamResult, Question } from '../types/examBank';
+import type { ExamBank, ExamResult, ExamExportMode, Question } from '../types/examBank';
 
 const BANKS_KEY = 'french-exam-banks';
 const RESULTS_KEY = 'french-exam-results';
@@ -7,7 +7,9 @@ export function loadBanks(): ExamBank[] {
   try {
     const raw = localStorage.getItem(BANKS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
@@ -38,14 +40,25 @@ export function validateBank(data: unknown): string | null {
   if (!Array.isArray(bank.questions)) return '缺少 questions 数组。';
   if (!bank.questions.length) return '题库至少需要包含 1 道题。';
 
-  const validTypes = ['single_choice', 'multiple_choice', 'true_false', 'fill_in_blank', 'short_answer', 'writing'];
+  const validTypes = [
+    'single_choice',
+    'multiple_choice',
+    'true_false',
+    'fill_in_blank',
+    'short_answer',
+    'writing',
+    'listening_single_choice',
+    'listening_multiple_choice',
+    'listening_fill_in_blank',
+  ];
   const validDifficulties = ['easy', 'medium', 'hard'];
 
   for (const q of bank.questions as Record<string, unknown>[]) {
     if (!q.id || !q.type || !q.content) return `题目 ${q.id || '未命名'} 缺少必要字段 (id/type/content)。`;
     if (!validTypes.includes(q.type as string)) return `题目 ${q.id} 的 type "${q.type}" 不支持。`;
     if (q.difficulty && !validDifficulties.includes(q.difficulty as string)) return `题目 ${q.id} 的 difficulty 必须是 easy/medium/hard。`;
-    if ((q.type === 'single_choice' || q.type === 'multiple_choice') && !Array.isArray(q.options)) return `题目 ${q.id} 必须提供 options 数组。`;
+    if ((q.type === 'single_choice' || q.type === 'multiple_choice' || q.type === 'listening_single_choice' || q.type === 'listening_multiple_choice') && !Array.isArray(q.options)) return `题目 ${q.id} 必须提供 options 数组。`;
+    if (String(q.type).startsWith('listening_') && typeof q.audio_text !== 'string') return `听力题 ${q.id} 必须提供 audio_text 字段。`;
   }
 
   return null;
@@ -69,9 +82,11 @@ export function normalizeText(s: string): string {
 export function checkAnswer(question: Question, userAnswer: unknown): boolean {
   switch (question.type) {
     case 'single_choice':
+    case 'listening_single_choice':
       return userAnswer === question.correct_answer;
 
-    case 'multiple_choice': {
+    case 'multiple_choice':
+    case 'listening_multiple_choice': {
       if (!Array.isArray(userAnswer) || !Array.isArray(question.correct_answer)) return false;
       const sorted = [...userAnswer].sort().join('|');
       const correct = [...question.correct_answer].sort().join('|');
@@ -79,9 +94,25 @@ export function checkAnswer(question: Question, userAnswer: unknown): boolean {
     }
 
     case 'true_false':
-      return userAnswer === question.correct_answer;
+      return userAnswer === question.correct_answer || String(userAnswer) === String(question.correct_answer);
 
-    case 'fill_in_blank': {
+    case 'fill_in_blank':
+    case 'listening_fill_in_blank': {
+      if (question.blanks?.length) {
+        if (!Array.isArray(userAnswer)) return false;
+        return question.blanks.every((blank, index) => {
+          const userText = normalizeText(String(userAnswer[index] || ''));
+          const accepted = Array.isArray(blank.answer) ? blank.answer : [blank.answer];
+          return userText.length > 0 && accepted.some(answer => normalizeText(answer) === userText);
+        });
+      }
+
+      if (Array.isArray(userAnswer) && Array.isArray(question.correct_answer)) {
+        return question.correct_answer.every((answer, index) => (
+          normalizeText(String(userAnswer[index] || '')) === normalizeText(String(answer))
+        ));
+      }
+
       const userText = normalizeText(String(userAnswer || ''));
       if (!userText) return false;
       const keywords = question.accept_keywords
@@ -99,7 +130,6 @@ export function checkAnswer(question: Question, userAnswer: unknown): boolean {
     }
 
     case 'writing':
-      // Writing questions are always "submitted" (not auto-graded)
       return String(userAnswer || '').trim().length > 0;
 
     default:
@@ -111,7 +141,9 @@ export function loadResults(): ExamResult[] {
   try {
     const raw = localStorage.getItem(RESULTS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
@@ -122,41 +154,67 @@ export function saveResult(result: ExamResult): void {
   localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
 }
 
-/**
- * Build a structured JSON "grading package" for AI review.
- * Contains: exam info, each writing question + student answer, and a grading prompt.
- */
-export function buildGradingPackage(bank: ExamBank, answers: ExamResult['answers']): string {
-  const writingQuestions = bank.questions.filter(q => q.type === 'writing');
-  if (writingQuestions.length === 0) return '';
+export function getMissedQuestionIds(bankId: string): string[] {
+  const missed = new Set<string>();
+  const recovered = new Set<string>();
 
-  const submissions = writingQuestions.map(q => ({
+  for (const result of loadResults().filter(r => r.bankId === bankId).reverse()) {
+    for (const [questionId, answer] of Object.entries(result.answers)) {
+      if (answer.correct) {
+        recovered.add(questionId);
+        missed.delete(questionId);
+      } else if (!recovered.has(questionId)) {
+        missed.add(questionId);
+      }
+    }
+  }
+
+  return [...missed];
+}
+
+export function buildGradingPackage(
+  bank: ExamBank,
+  answers: ExamResult['answers'],
+  mode: ExamExportMode = 'short_answer_only',
+): string {
+  const exportableTypes = mode === 'short_answer_only'
+    ? new Set<Question['type']>(['short_answer', 'writing'])
+    : null;
+
+  const exportQuestions = bank.questions.filter(q => {
+    if (!answers[q.id]) return false;
+    return !exportableTypes || exportableTypes.has(q.type);
+  });
+  if (exportQuestions.length === 0) return '';
+
+  const submissions = exportQuestions.map(q => ({
     id: q.id,
+    type: q.type,
     question: q.content,
+    options: q.options || null,
     writing_prompt: q.writing_prompt || null,
     word_limit: q.word_limit || null,
     grading_criteria: q.grading_criteria || null,
     reference_answer: q.correct_answer || null,
-    student_answer: String(answers[q.id]?.userAnswer || ''),
+    blanks: q.blanks || null,
+    student_answer: answers[q.id]?.userAnswer ?? '',
+    auto_correct: answers[q.id]?.correct ?? null,
+    explanation: q.explanation || null,
   }));
 
   const pkg = {
-    _type: 'ai_grading_package',
-    _version: 1,
+    type: mode,
+    version: 2,
     exam_title: bank.exam_title,
     date: new Date().toISOString(),
-    total_writing_questions: submissions.length,
+    total_questions: submissions.length,
     submissions,
-    grading_instructions: `请你作为一位专业的法语教师，逐题批改以下写作题。
-
-对每道题，请提供：
-1. **得分** (0-100)
-2. **语法纠错**：逐句标出语法错误并给出修正
-3. **词汇评价**：评估用词准确性和丰富度
-4. **表达改进**：给出更地道的法语表达建议
-5. **总评**：整体评语和进步建议
-
-${writingQuestions.some(q => q.grading_criteria?.length) ? '请特别关注题目指定的评分维度。' : ''}
+    grading_instructions: `请作为专业法语教师批改以下答题记录。请逐题提供：
+1. 得分 (0-100)
+2. 语法纠错：指出错误并给出修正
+3. 词汇评价：评价用词准确性和丰富度
+4. 表达改进：给出更自然的法语表达
+5. 总评：整体评价和下一步建议
 
 请用中文回复，法语原文和修正保留法语。输出格式为 JSON 数组，每个元素对应一道题：
 [

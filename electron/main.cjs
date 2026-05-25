@@ -47,9 +47,7 @@ function findFrenchVoice() {
 
 let frenchVoice = 'Thomas';
 
-app.whenReady().then(async () => {
-  frenchVoice = await findFrenchVoice();
-
+function registerMacTtsHandlers() {
   ipcMain.handle('tts:speak', (_event, text, rate) => {
     return new Promise((resolve, reject) => {
       const wpm = rate === 'slow' ? 100 : rate === 'fast' ? 260 : 180;
@@ -81,7 +79,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('tts:setVoice', (_event, name) => {
     frenchVoice = name;
   });
+}
 
+app.whenReady().then(async () => {
+  if (process.platform === 'darwin') {
+    frenchVoice = await findFrenchVoice();
+    registerMacTtsHandlers();
+  }
   createWindow();
 });
 

@@ -8,11 +8,18 @@ interface Props {
 }
 
 export default function SpeedTimer({ seconds, onTimeout, running, resetKey }: Props) {
-  const [remaining, setRemaining] = useState(seconds);
+  return (
+    <SpeedTimerBar
+      key={`${seconds}-${resetKey}`}
+      seconds={seconds}
+      onTimeout={onTimeout}
+      running={running}
+    />
+  );
+}
 
-  useEffect(() => {
-    setRemaining(seconds);
-  }, [seconds, resetKey]);
+function SpeedTimerBar({ seconds, onTimeout, running }: Omit<Props, 'resetKey'>) {
+  const [remaining, setRemaining] = useState(seconds);
 
   useEffect(() => {
     if (!running) return;

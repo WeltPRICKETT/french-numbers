@@ -2,6 +2,8 @@
   "name": "french-numbers",
   "private": true,
   "version": "1.0.0",
+  "description": "A French number practice desktop app.",
+  "author": "French Numbers",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -52,6 +54,7 @@
     },
     "win": {
       "artifactName": "FrenchHelper-${version}-win-${arch}.${ext}",
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "dir",

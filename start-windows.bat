@@ -8,46 +8,45 @@ set PORT=5173
 set URL=http://%HOST%:%PORT%/
 
 echo =========================================
-echo   法语数字练习 ^(French Numbers^)
+echo   French Numbers Practice
 echo =========================================
-echo   练习页面: %URL%
-echo   离线音频: public\audio\fr\0-100.wav
+echo   Practice page: %URL%
 echo.
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo [错误] 未找到 Node.js。请先安装 Node.js LTS: https://nodejs.org/
+  echo [Error] Node.js was not found. Install Node.js LTS: https://nodejs.org/
   pause
   exit /b 1
 )
 
 where npm >nul 2>nul
 if errorlevel 1 (
-  echo [错误] 未找到 npm。请确认 Node.js 安装完整。
+  echo [Error] npm was not found. Please reinstall Node.js LTS.
   pause
   exit /b 1
 )
 
 if not exist node_modules (
-  echo [首次运行] 正在安装依赖...
+  echo [First run] Installing dependencies...
   call npm install
   if errorlevel 1 (
-    echo [错误] 依赖安装失败。
+    echo [Error] Dependency installation failed.
     pause
     exit /b 1
   )
 )
 
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:":%PORT% .*LISTENING"') do (
-  echo [重启] 发现 %PORT% 端口已有服务，正在关闭 PID %%p...
+  echo [Restart] Port %PORT% is already in use. Stopping PID %%p...
   taskkill /F /PID %%p >nul 2>nul
 )
 
-echo [启动] 正在打开 %URL%
+echo [Start] Opening %URL%
 echo.
 
 call npx vite --host %HOST% --port %PORT% --strictPort --force --open %URL%
 
 echo.
-echo 服务已停止。
+echo Server stopped.
 pause

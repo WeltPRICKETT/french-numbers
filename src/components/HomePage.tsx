@@ -13,6 +13,7 @@ interface Props {
   onViewMistakes: () => void;
   onViewStats: () => void;
   onViewExamBank: () => void;
+  onViewNumberTable: () => void;
   mistakeCount: number;
 }
 
@@ -27,6 +28,7 @@ export default function HomePage({
   onViewMistakes,
   onViewStats,
   onViewExamBank,
+  onViewNumberTable,
   mistakeCount,
 }: Props) {
   return (
@@ -90,6 +92,12 @@ export default function HomePage({
             className="btn-royal w-full py-3.5 text-sm tracking-wider"
           >
             COMMENCER
+          </button>
+          <button
+            onClick={onViewNumberTable}
+            className="btn-gold w-full py-3 text-sm tracking-wider"
+          >
+            TABLE DES NOMBRES
           </button>
           {!selectedMode && (
             <p className="font-body text-xs text-[var(--c-muted)] text-center italic">

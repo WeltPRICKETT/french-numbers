@@ -1,17 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { StudyStats } from '../types';
-import { loadStats, getDefaultStats } from '../utils/storage';
+import { loadStats } from '../utils/storage';
 
 interface Props {
   onBack: () => void;
 }
 
 export default function StatsPage({ onBack }: Props) {
-  const [stats, setStats] = useState<StudyStats>(getDefaultStats());
-
-  useEffect(() => {
-    setStats(loadStats());
-  }, []);
+  const [stats] = useState<StudyStats>(() => loadStats());
 
   const todayAccuracy = stats.todayAnswered > 0
     ? ((stats.todayCorrect / stats.todayAnswered) * 100).toFixed(1)

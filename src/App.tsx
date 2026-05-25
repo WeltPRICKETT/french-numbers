@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { PracticeMode, Difficulty } from './types';
-import type { ExamBank } from './types/examBank';
+import type { ExamBank, ExamSessionOptions } from './types/examBank';
 import { loadMistakes } from './utils/storage';
 import { useSettings } from './hooks/useSettings';
 import HomePage from './components/HomePage';
@@ -11,8 +11,9 @@ import ExamBankPage from './components/ExamBankPage';
 import ExamPracticePage from './components/ExamPracticePage';
 import SettingsPage from './components/SettingsPage';
 import ThemeToggle from './components/ThemeToggle';
+import NumberTablePage from './components/NumberTablePage';
 
-type Page = 'home' | 'practice' | 'review' | 'stats' | 'exam-bank' | 'exam-practice' | 'settings';
+type Page = 'home' | 'practice' | 'review' | 'stats' | 'exam-bank' | 'exam-practice' | 'settings' | 'number-table';
 
 export default function App() {
   const [page, setPage] = useState<Page>('home');
@@ -20,16 +21,12 @@ export default function App() {
   const [mode, setMode] = useState<PracticeMode | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>(1);
   const [customRange, setCustomRange] = useState<[number, number]>([0, 100]);
-  const [mistakeCount, setMistakeCount] = useState(0);
+  const [mistakeCount, setMistakeCount] = useState(() => loadMistakes().length);
   const [mistakeNumbers, setMistakeNumbers] = useState<number[] | undefined>();
   const [examBank, setExamBank] = useState<ExamBank | null>(null);
+  const [examOptions, setExamOptions] = useState<ExamSessionOptions | null>(null);
 
   const { settings, setSettings, toggleTheme, resetSettings } = useSettings();
-
-  useEffect(() => {
-    const mistakes = loadMistakes();
-    setMistakeCount(mistakes.length);
-  }, [page]);
 
   const handleStart = () => {
     if (!mode) return;
@@ -45,6 +42,7 @@ export default function App() {
   };
 
   const handleBack = () => {
+    setMistakeCount(loadMistakes().length);
     setPage('home');
   };
 
@@ -78,6 +76,7 @@ export default function App() {
           onViewMistakes={() => setPage('review')}
           onViewStats={() => setPage('stats')}
           onViewExamBank={() => setPage('exam-bank')}
+          onViewNumberTable={() => setPage('number-table')}
           mistakeCount={mistakeCount}
         />
       )}
@@ -102,12 +101,13 @@ export default function App() {
       {page === 'exam-bank' && (
         <ExamBankPage
           onBack={handleBack}
-          onStartExam={(bank) => { setExamBank(bank); setPage('exam-practice'); }}
+          onStartExam={(bank, options) => { setExamBank(bank); setExamOptions(options); setPage('exam-practice'); }}
         />
       )}
-      {page === 'exam-practice' && examBank && (
+      {page === 'exam-practice' && examBank && examOptions && (
         <ExamPracticePage
           bank={examBank}
+          options={examOptions}
           onBack={() => setPage('exam-bank')}
           onFinish={() => setPage('exam-bank')}
         />
@@ -119,6 +119,9 @@ export default function App() {
           onReset={resetSettings}
           onBack={closeSettings}
         />
+      )}
+      {page === 'number-table' && (
+        <NumberTablePage onBack={handleBack} />
       )}
     </>
   );

@@ -38,6 +38,13 @@ interface Props {
 }
 
 export default function PracticePage({ mode, difficulty, customRange, onBack, mistakeNumbers }: Props) {
+  const generateQuestion = useCallback((): number => {
+    if (mistakeNumbers && mistakeNumbers.length > 0) {
+      return mistakeNumbers[Math.floor(Math.random() * mistakeNumbers.length)];
+    }
+    return generateNumberForDifficulty(difficulty, customRange?.[0], customRange?.[1]);
+  }, [customRange, difficulty, mistakeNumbers]);
+
   const [currentNumber, setCurrentNumber] = useState(() => generateQuestion());
   const [userAnswer, setUserAnswer] = useState('');
   const [feedback, setFeedback] = useState<FeedbackState>('idle');
@@ -46,20 +53,13 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
   const [questionCount, setQuestionCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(() => Date.now());
 
   // Speed mode states
   const [speedSeconds, setSpeedSeconds] = useState(5);
   const [speedSubMode, setSpeedSubMode] = useState<'audio-to-number' | 'number-to-french' | 'french-to-number'>('audio-to-number');
   const [speedTimerKey, setSpeedTimerKey] = useState(0);
-  const [speedRunning, setSpeedRunning] = useState(false);
-
-  function generateQuestion(): number {
-    if (mistakeNumbers && mistakeNumbers.length > 0) {
-      return mistakeNumbers[Math.floor(Math.random() * mistakeNumbers.length)];
-    }
-    return generateNumberForDifficulty(difficulty, customRange?.[0], customRange?.[1]);
-  }
+  const [speedRunning, setSpeedRunning] = useState(mode === 'speed');
 
   const resetQuestion = useCallback(() => {
     const next = generateQuestion();
@@ -70,7 +70,7 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
     setChoices(generateChoices(next));
     setStartTime(Date.now());
     setSpeedTimerKey((k) => k + 1);
-  }, [difficulty, mistakeNumbers]);
+  }, [generateQuestion]);
 
   const handleCorrect = useCallback(() => {
     const reactionTime = Date.now() - startTime;
@@ -97,13 +97,13 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
     setSpeedRunning(false);
   }, [currentNumber, mode, difficulty]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     setQuestionCount((c) => c + 1);
     resetQuestion();
     if (mode === 'speed') {
       setSpeedRunning(true);
     }
-  };
+  }, [mode, resetQuestion]);
 
   const submitTextAnswer = () => {
     if (feedback !== 'idle') return;
@@ -143,7 +143,7 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
     }
   };
 
-  const handleChoiceSelect = (value: number) => {
+  const handleChoiceSelect = useCallback((value: number) => {
     if (feedback !== 'idle') return;
     setSelectedChoice(value);
     if (value === currentNumber) {
@@ -151,13 +151,7 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
     } else {
       handleIncorrect();
     }
-  };
-
-  useEffect(() => {
-    if (mode === 'speed') {
-      setSpeedRunning(true);
-    }
-  }, [mode]);
+  }, [currentNumber, feedback, handleCorrect, handleIncorrect]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -168,13 +162,6 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
 
       // Enter: next question when feedback is shown
       if (e.key === 'Enter' && feedback !== 'idle') {
-        e.preventDefault();
-        handleNext();
-        return;
-      }
-
-      // Right arrow: same as Enter when feedback is shown
-      if (e.key === 'ArrowRight' && feedback !== 'idle') {
         e.preventDefault();
         handleNext();
         return;
@@ -426,7 +413,6 @@ export default function PracticePage({ mode, difficulty, customRange, onBack, mi
         {/* Keyboard hints */}
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 font-body text-xs text-[var(--c-muted)] italic mt-4">
           <span>Enter — valider</span>
-          <span>→ — suivant</span>
           <span>Espace — écouter</span>
           {(mode === 'multiple-choice-number' || mode === 'multiple-choice-audio') && (
             <span>1-4 — choisir</span>
